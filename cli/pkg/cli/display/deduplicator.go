@@ -36,13 +36,18 @@ func (d *MessageDeduplicator) IsDuplicate(msg *types.ClineMessage) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// Skip deduplication for very short messages (likely real duplicates)
+	if len(msg.Text) < 10 {
+		return false
+	}
+
 	// Create a hash of the message content
 	hash := d.hashMessage(msg)
 
 	// Check if we've seen this message recently
 	if lastSeen, exists := d.seenMessages[hash]; exists {
-		// If we've seen it within the last few seconds, it's a duplicate
-		if time.Since(lastSeen) < 2*time.Second {
+		// Extend window from 2 seconds to 10 seconds for better duplicate detection
+		if time.Since(lastSeen) < 10*time.Second {
 			return true
 		}
 	}

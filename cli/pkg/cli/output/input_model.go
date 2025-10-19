@@ -397,8 +397,15 @@ func (m *InputModel) ClearScreen() string {
 		return ""
 	}
 
-	// Move cursor up by lastHeight lines and clear from cursor to end of screen
-	return fmt.Sprintf("\033[%dA\033[J", m.lastHeight)
+	// Calculate actual height based on current content
+	currentHeight := lipgloss.Height(m.View())
+
+	if currentHeight == 0 {
+		return ""
+	}
+
+	// Move cursor up by current height and clear
+	return fmt.Sprintf("\033[%dA\033[J", currentHeight)
 }
 
 // Clone creates a deep copy of the InputModel with all state preserved

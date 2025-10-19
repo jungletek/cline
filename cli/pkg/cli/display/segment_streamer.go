@@ -55,11 +55,11 @@ func (ss *StreamingSegment) AppendText(text string) {
 		return
 	}
 
-	// Replace buffer with FULL text - msg.Text contains complete accumulated content
-	ss.buffer.Reset()
+	// Append to existing buffer instead of replacing
 	ss.buffer.WriteString(text)
-	
-	// No rendering during streaming - we'll render once on Freeze()
+
+	// Only render during streaming for typewriter effect if needed
+	// Don't render here - wait for Freeze() to render complete content
 }
 
 

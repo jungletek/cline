@@ -1060,6 +1060,11 @@ func (m *Manager) handlePartialMessageStream(ctx context.Context, coordinator *S
 			m.renderer.RenderDebug("Received streaming message: type=%s, partial=%v, text_len=%d",
 				msg.Type, msg.Partial, len(msg.Text))
 
+			// Use processing lock to prevent race conditions with state stream
+			if coordinator.IsMessageAlreadyProcessed(msg.Timestamp) {
+				continue
+			}
+
 			// Handle the message with streaming support for de-dupping
 			if err := m.handleStreamingMessage(msg, coordinator); err != nil {
 				m.renderer.RenderDebug("Error handling streaming message: %v", err)

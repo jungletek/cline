@@ -529,16 +529,27 @@ func (ih *InputHandler) IsRunning() bool {
 // restartProgram restarts the Bubble Tea program with preserved state
 func (ih *InputHandler) restartProgram(savedModel *output.InputModel) {
 	ih.mu.Lock()
+	defer ih.mu.Unlock()
 
-	// Wait for old program to actually quit
-	if ih.programDoneChan != nil {
-		select {
-		case <-ih.programDoneChan:
-			// Program quit successfully
-		case <-time.After(100 * time.Millisecond):
-			// Timeout - continue anyway
+	// Ensure any existing program is completely stopped
+	if ih.program != nil && ih.programRunning {
+		ih.program.Quit()
+		// Wait for program to actually quit
+		if ih.programDoneChan != nil {
+			select {
+			case <-ih.programDoneChan:
+				// Program quit successfully
+			case <-time.After(500 * time.Millisecond):
+				// Force kill if taking too long
+				ih.programRunning = false
+			}
 		}
 	}
+
+	// Clear all channels and state
+	ih.programDoneChan = nil
+	ih.program = nil
+	ih.programRunning = false
 
 	// Create new wrapper with the saved model
 	wrappedModel := &inputProgramWrapper{
@@ -551,22 +562,21 @@ func (ih *InputHandler) restartProgram(savedModel *output.InputModel) {
 	// Start new program
 	ih.program = tea.NewProgram(wrappedModel)
 	ih.programDoneChan = make(chan struct{})
+	ih.programRunning = true
 
-	// Update coordinator references
+	// Update global references
 	output.SetProgram(ih.program)
 	output.SetInputModel(savedModel)
 	output.SetInputVisible(true)
-	ih.programRunning = true
-	ih.mu.Unlock()
 
 	// Run in goroutine
 	go func() {
+		defer close(ih.programDoneChan)
 		if _, err := ih.program.Run(); err != nil {
-			// Log error if needed
+			// Log error but don't restart automatically
 			if global.Config.Verbose {
-				output.Printf("\nDebug: Program restart error: %v\n", err)
+				output.Printf("\nDebug: Program error: %v\n", err)
 			}
 		}
-		close(ih.programDoneChan)
 	}()
 }

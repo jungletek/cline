@@ -7,6 +7,8 @@ type StreamCoordinator struct {
 	conversationTurnStartIndex int             // First message index of current turn
 	processedInCurrentTurn     map[string]bool // What we've handled in THIS turn
 	inputAllowed               bool            // Whether user input is currently allowed
+	processingMutex            sync.Mutex      // Protects message processing
+	lastProcessedTimestamp     int64           // Last processed message timestamp
 	mu                         sync.RWMutex    // Protects inputAllowed
 }
 
@@ -57,4 +59,16 @@ func (sc *StreamCoordinator) IsInputAllowed() bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	return sc.inputAllowed
+}
+
+// IsMessageAlreadyProcessed checks if a message has already been processed and updates the timestamp
+func (sc *StreamCoordinator) IsMessageAlreadyProcessed(timestamp int64) bool {
+	sc.processingMutex.Lock()
+	defer sc.processingMutex.Unlock()
+
+	if timestamp <= sc.lastProcessedTimestamp {
+		return true
+	}
+	sc.lastProcessedTimestamp = timestamp
+	return false
 }
