@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 	"text/tabwriter"
 	"time"
 
 	"github.com/cline/cli/pkg/cli/display"
 	"github.com/cline/cli/pkg/cli/global"
 	"github.com/cline/cli/pkg/common"
-	client2 "github.com/cline/grpc-go/client"
 	"github.com/cline/grpc-go/cline"
+	"github.com/cline/grpc-go/host"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
@@ -32,17 +33,21 @@ func detectInstancePlatform(ctx context.Context, instance *common.CoreInstanceIn
 		return platformNA, err
 	}
 
-	hostClient, err := client2.NewClineClient(hostTarget)
+	// Create direct gRPC connection to host bridge
+	conn, err := grpc.DialContext(ctx, hostTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 	if err != nil {
 		return platformNA, err
 	}
-	defer hostClient.Disconnect()
+	defer conn.Close()
 
-	if err := hostClient.Connect(ctx); err != nil {
-		return platformNA, err
-	}
+	// Create the Env service client directly from generated code
+	envClient := host.NewEnvServiceClient(conn)
 
-	hostVersion, err := hostClient.Env.GetHostVersion(ctx, &cline.EmptyRequest{})
+	// Call GetHostVersion
+	hostVersion, err := envClient.GetHostVersion(ctx, &cline.EmptyRequest{})
 	if err != nil {
 		return platformNA, err
 	}
@@ -261,8 +266,12 @@ func killInstanceProcess(ctx context.Context, registry *global.ClientRegistry, a
 
 	pid := int(processInfo.ProcessId)
 
-	// Kill the process
-	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+	// Kill the process using Go's cross-platform Process.Kill()
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return killResult{address: address, pid: pid, err: err}
+	}
+	if err := process.Kill(); err != nil {
 		return killResult{address: address, pid: pid, err: err}
 	}
 

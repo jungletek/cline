@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"reflect" // Added for Windows compat b/c it lacks Setpgid
+	"runtime" // Added for Windows compat b/c it lacks syscall
 	"syscall"
 	"time"
 
@@ -252,8 +254,25 @@ func startClineHost(hostPort, corePort int) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
-	binDir := path.Dir(execPath)
-	clineHostPath := path.Join(binDir, "cline-host")
+	// Use filepath for Windows compatibility
+	binDir := filepath.Dir(execPath)
+
+	// On Windows, executables need .exe extension
+	var clineHostPath string
+	if runtime.GOOS == "windows" {
+		clineHostPath = filepath.Join(binDir, "cline-host.exe")
+	} else {
+		clineHostPath = filepath.Join(binDir, "cline-host")
+	}
+
+	// Ensure absolute path for Windows compatibility
+	absPath, err := filepath.Abs(clineHostPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path for cline-host: %w", err)
+	}
+	if Config.Verbose {
+		fmt.Printf("DEBUG: cline-host absolute path: %s\n", absPath)
+	}
 
 	// Start the cline-host process
 	cmd := exec.Command(clineHostPath,
@@ -280,8 +299,17 @@ func startClineHost(hostPort, corePort int) (*exec.Cmd, error) {
 	cmd.Stderr = logFile
 
 	// Put the child process in a new process group so Ctrl+C doesn't kill it
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+	// Note: SysProcAttr is only set on non-Windows systems for process group management
+	if runtime.GOOS != "windows" {
+		sysProcAttrType := reflect.TypeOf(syscall.SysProcAttr{})
+		if _, found := sysProcAttrType.FieldByName("Setpgid"); found {
+			cmd.SysProcAttr = &syscall.SysProcAttr{}
+			// Use reflection to set Setpgid field
+			v := reflect.ValueOf(cmd.SysProcAttr).Elem()
+			if setpgidField := v.FieldByName("Setpgid"); setpgidField.CanSet() {
+				setpgidField.SetBool(true)
+			}
+		}
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -324,8 +352,12 @@ func KillInstanceByAddress(ctx context.Context, registry *ClientRegistry, addres
 		fmt.Printf("Terminating process PID %d...\n", pid)
 	}
 
-	// Kill the process
-	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+	// Kill the process using Go's cross-platform Process.Kill()
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("failed to find process %d: %w", pid, err)
+	}
+	if err := process.Kill(); err != nil {
 		return fmt.Errorf("failed to kill process %d: %w", pid, err)
 	}
 
@@ -386,9 +418,9 @@ func startClineCore(corePort, hostPort int) (*exec.Cmd, error) {
 		}
 	}
 
-	binDir := path.Dir(realPath)
-	installDir := path.Dir(binDir)
-	clineCorePath := path.Join(installDir, "cline-core.js")
+	binDir := filepath.Dir(realPath)
+	installDir := filepath.Dir(binDir)
+	clineCorePath := filepath.Join(installDir, "cline-core.js")
 
 	if Config.Verbose {
 		fmt.Printf("Executable path: %s\n", execPath)
@@ -406,8 +438,8 @@ func startClineCore(corePort, hostPort int) (*exec.Cmd, error) {
 	if _, err := os.Stat(clineCorePath); os.IsNotExist(err) {
 		// Development mode: Try ../../dist-standalone/cline-core.js
 		// This handles the case where we're running from cli/bin/cline
-		devClineCorePath := path.Join(binDir, "..", "..", "dist-standalone", "cline-core.js")
-		devInstallDir := path.Join(binDir, "..", "..", "dist-standalone")
+		devClineCorePath := filepath.Join(binDir, "..", "..", "dist-standalone", "cline-core.js")
+		devInstallDir := filepath.Join(binDir, "..", "..", "dist-standalone")
 		
 		if Config.Verbose {
 			fmt.Printf("Primary location not found, trying development path: %s\n", devClineCorePath)
@@ -465,8 +497,18 @@ func startClineCore(corePort, hostPort int) (*exec.Cmd, error) {
 	cmd.Stderr = logFile
 
 	// Put the child process in a new process group so Ctrl+C doesn't kill it
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+	// Note: SysProcAttr is only set on non-Windows systems for process group management
+	// Use reflection to safely set Setpgid field on Unix systems only
+	if runtime.GOOS != "windows" {
+		sysProcAttrType := reflect.TypeOf(syscall.SysProcAttr{})
+		if _, found := sysProcAttrType.FieldByName("Setpgid"); found {
+			cmd.SysProcAttr = &syscall.SysProcAttr{}
+			// Use reflection to set Setpgid field
+			v := reflect.ValueOf(cmd.SysProcAttr).Elem()
+			if setpgidField := v.FieldByName("Setpgid"); setpgidField.CanSet() {
+				setpgidField.SetBool(true)
+			}
+		}
 	}
 
 	// Set environment variables with NODE_PATH for both real and fake node_modules
