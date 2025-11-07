@@ -52,8 +52,6 @@ func (h *AskHandler) Handle(msg *types.ClineMessage, dc *DisplayContext) error {
 		return h.handleResumeCompletedTask(msg, dc)
 	case string(types.AskTypeMistakeLimitReached):
 		return h.handleMistakeLimitReached(msg, dc)
-	case string(types.AskTypeAutoApprovalMaxReached):
-		return h.handleAutoApprovalMaxReached(msg, dc)
 	case string(types.AskTypeBrowserActionLaunch):
 		return h.handleBrowserActionLaunch(msg, dc)
 	case string(types.AskTypeUseMcpServer):
@@ -128,8 +126,8 @@ func (h *AskHandler) handlePlanModeRespond(msg *types.ClineMessage, dc *DisplayC
 // showApprovalHint displays a hint in non-interactive mode about how to approve/deny
 func (h *AskHandler) showApprovalHint(dc *DisplayContext) {
 	if !dc.IsInteractive {
-		output.Printf("\n\033[90mCline is requesting approval to use this tool\033[0m\n")
-		output.Printf("\033[90mUse \033[0mcline task send --approve\033[90m or \033[0m--deny\033[90m to respond\033[0m\n")
+		output.Printf("\n%s\n", dc.Renderer.Dim("Cline is requesting approval to use this tool"))
+		output.Printf("%s\n", dc.Renderer.Dim("Use cline task send --approve or --deny to respond"))
 	}
 }
 
@@ -253,25 +251,6 @@ func (h *AskHandler) handleMistakeLimitReached(msg *types.ClineMessage, dc *Disp
 		return nil
 	}
 	return dc.Renderer.RenderMessage("ERROR", fmt.Sprintf("Mistake Limit Reached: %s. Approval required.", msg.Text), true)
-}
-
-// handleAutoApprovalMaxReached handles auto-approval max reached
-func (h *AskHandler) handleAutoApprovalMaxReached(msg *types.ClineMessage, dc *DisplayContext) error {
-	if dc.SystemRenderer != nil {
-		details := make(map[string]string)
-		if msg.Text != "" {
-			details["reason"] = msg.Text
-		}
-		dc.SystemRenderer.RenderError(
-			"warning",
-			"Auto-Approval Limit Reached",
-			"The maximum number of auto-approved requests has been reached. Manual approval is now required.",
-			details,
-		)
-		fmt.Printf("\n**Approval required to continue.**\n")
-		return nil
-	}
-	return dc.Renderer.RenderMessage("WARNING", fmt.Sprintf("Auto-approval limit reached: %s. Approval required.", msg.Text), true)
 }
 
 // handleBrowserActionLaunch handles browser action launch requests
