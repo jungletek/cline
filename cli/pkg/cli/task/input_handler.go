@@ -511,16 +511,42 @@ func (ih *InputHandler) handleSpecialCommand(ctx context.Context, message string
 	}
 }
 
-// Stop stops the input handler
+// Stop() stops the input handler and cleans up all resources
 func (ih *InputHandler) Stop() {
 	ih.mu.Lock()
 	defer ih.mu.Unlock()
+
+	// Stop the polling ticker
 	if ih.pollTicker != nil {
 		ih.pollTicker.Stop()
+		ih.pollTicker = nil
 	}
+
+	// Stop any running Bubble Tea program
 	if ih.program != nil && ih.programRunning {
 		ih.program.Quit()
+
+		// Wait for program to actually quit with timeout
+		if ih.programDoneChan != nil {
+			select {
+			case <-ih.programDoneChan:
+				// Program quit successfully
+			case <-time.After(200 * time.Millisecond):
+				// Force continue - program should be stopped
+			}
+		}
 	}
+
+	// Clear all channels to prevent goroutine leaks
+	close(ih.cancelChan)
+	ih.cancelChan = nil
+
+	// Clear global references to help GC
+	if ih.programDoneChan != nil {
+		ih.programDoneChan = nil
+	}
+	ih.program = nil
+	ih.programRunning = false
 	ih.isRunning = false
 }
 

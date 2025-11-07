@@ -1279,10 +1279,20 @@ func (m *Manager) UpdateTaskAutoApprovalAction(ctx context.Context, actionKey st
 	return nil
 }
 
-// Cleanup cleans up resources
+// Cleanup cleans up resources and prevents memory leaks
+// Note: Be conservative with client cleanup to avoid connection drops
 func (m *Manager) Cleanup() {
 	// Clean up streaming display resources if needed
 	if m.streamingDisplay != nil {
 		m.streamingDisplay.Cleanup()
+		m.streamingDisplay = nil
 	}
+
+	// Clear non-critical references to help GC
+	// Don't clear m.client as it may cause connection drops during active operations
+	m.state = nil
+	m.renderer = nil
+	m.toolRenderer = nil
+	m.systemRenderer = nil
+	m.handlerRegistry = nil
 }

@@ -1,3 +1,5 @@
+.gitignore
+
 out
 dist
 dist-standalone
@@ -29,9 +31,17 @@ coverage-unit
 .env
 
 ## Generated files ##
-src/generated/
+src/generated/grpc-js
+src/generated/nice-grpc
+src/generated/grpc-go/cline
+src/generated/grpc-go/host
 src/shared/proto/
 webview-ui/src/services/grpc-client.ts
 
 # E2E Tests
 test-results
+
+go.work.sum
+package-lock.json
+
+bugfix.md

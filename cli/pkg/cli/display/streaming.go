@@ -128,7 +128,19 @@ func (s *StreamingDisplay) FreezeActiveSegment() {
 // Cleanup cleans up streaming display resources
 func (s *StreamingDisplay) Cleanup() {
 	s.FreezeActiveSegment()
+
+	// Clear references to help GC
+	s.state = nil
+	s.renderer = nil
+
 	if s.dedupe != nil {
 		s.dedupe.Stop()
+		s.dedupe = nil
 	}
+
+	if s.mdRenderer != nil {
+		s.mdRenderer = nil
+	}
+
+	s.activeSegment = nil
 }

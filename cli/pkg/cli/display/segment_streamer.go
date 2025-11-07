@@ -73,7 +73,10 @@ func (ss *StreamingSegment) Freeze() {
 
 	ss.frozen = true
 	currentBuffer := ss.buffer.String()
-	
+
+	// Clear buffer to free memory after rendering
+	defer ss.buffer.Reset()
+
 	// Render and print the final markdown
 	ss.renderFinal(currentBuffer)
 }
