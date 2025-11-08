@@ -3,9 +3,52 @@ setlocal enabledelayedexpansion
 
 echo Building CLI for Windows...
 
-REM Skip protobuf generation for now if files don't exist
-REM npm run protos
-REM npm run protos-go
+echo Regenerating protobuf files...
+
+REM Generate Go client wrappers
+node generate-clients.mjs
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to generate Go clients
+    exit /b 1
+)
+
+REM Generate protobuf files manually (npm scripts fail on Windows)
+protoc --proto_path=./proto --go_out=./src/generated/grpc-go --go_opt=module=github.com/cline/grpc-go --go-grpc_out=./src/generated/grpc-go --go-grpc_opt=module=github.com/cline/grpc-go ./proto/cline/*.proto ./proto/host/*.proto
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to generate protobuf files
+    exit /b 1
+)
+
+REM Create go.mod for grpc-go module (gitignored upstream)
+echo Creating go.mod for grpc-go module...
+(
+    echo module github.com/cline/grpc-go
+    echo.
+    echo go 1.21
+    echo.
+    echo require (
+    echo         google.golang.org/grpc v1.65.0
+    echo         google.golang.org/protobuf v1.34.2
+    echo )
+    echo.
+    echo require (
+    echo         golang.org/x/net v0.26.0 // indirect
+    echo         golang.org/x/sys v0.21.0 // indirect
+    echo         golang.org/x/text v0.16.0 // indirect
+    echo         google.golang.org/genproto/googleapis/rpc v0.0.0-20240604185151-ef581f913117 // indirect
+    echo )
+) > "src\generated\grpc-go\go.mod"
+
+REM Tidy Go dependencies
+cd src\generated\grpc-go
+go mod tidy
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to tidy Go dependencies
+    exit /b 1
+)
+cd ..\..\
+
+echo   ✓ Protobuf files regenerated
 
 REM Create output directory
 if not exist "dist-standalone\extension" mkdir dist-standalone\extension
