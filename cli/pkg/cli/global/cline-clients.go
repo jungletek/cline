@@ -361,38 +361,38 @@ func KillInstanceByAddress(ctx context.Context, registry *ClientRegistry, addres
 		return fmt.Errorf("failed to kill process %d: %w", pid, err)
 	}
 
-	// Wait for the instance to remove itself from registry
+	// Remove the instance from registry directly since forceful kill prevents cleanup
 	if Config.Verbose {
-		fmt.Printf("Waiting for instance to clean up registry entry...\n")
+		fmt.Printf("Removing instance %s from registry...\n", address)
 	}
-	for i := 0; i < 5; i++ {
-		time.Sleep(1 * time.Second)
-		if !registry.HasInstanceAtAddress(address) {
-			if Config.Verbose {
-				fmt.Printf("Instance %s successfully killed and removed from registry.\n", address)
-			}
-
-			// Update default instance if needed
-			instances, err := registry.ListInstancesCleaned(ctx)
-			if err == nil && len(instances) > 0 {
-				// ensureDefaultInstance logic will handle setting a new default
-				defaultInstance := registry.GetDefaultInstance()
-				if defaultInstance == address || defaultInstance == "" {
-					if len(instances) > 0 {
-						if err := registry.SetDefaultInstance(instances[0].Address); err == nil {
-							if Config.Verbose {
-								fmt.Printf("Updated default instance to: %s\n", instances[0].Address)
-							}
-						}
-					}
-				}
-			}
-
-			return nil
+	if err := registry.lockManager.RemoveInstanceLock(address); err != nil {
+		if Config.Verbose {
+			fmt.Printf("Warning: Failed to remove instance %s from registry: %v\n", address, err)
+		}
+		// Don't return error here - the process is killed, registry cleanup is best-effort
+	} else {
+		if Config.Verbose {
+			fmt.Printf("Instance %s successfully killed and removed from registry.\n", address)
 		}
 	}
 
-	return fmt.Errorf("instance killed but failed to remove itself from registry within 5 seconds")
+	// Update default instance if needed
+	instances, err := registry.ListInstancesCleaned(ctx)
+	if err == nil && len(instances) > 0 {
+		// ensureDefaultInstance logic will handle setting a new default
+		defaultInstance := registry.GetDefaultInstance()
+		if defaultInstance == address || defaultInstance == "" {
+			if len(instances) > 0 {
+				if err := registry.SetDefaultInstance(instances[0].Address); err == nil {
+					if Config.Verbose {
+						fmt.Printf("Updated default instance to: %s\n", instances[0].Address)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func startClineCore(corePort, hostPort int) (*exec.Cmd, error) {
