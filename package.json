@@ -296,7 +296,7 @@
 		"compile": "npm run check-types && npm run lint && node esbuild.mjs",
 		"compile-standalone": "npm run check-types && npm run lint && node esbuild.mjs --standalone",
 		"compile-standalone-npm": "npm run protos && npm run protos-go && npm run check-types && npm run lint && node esbuild.mjs --standalone",
-		"compile-cli": "scripts/build-cli.sh",
+		"compile-cli": "node -e \"process.platform === 'win32' ? require('child_process').execSync('scripts/build-cli.bat', {stdio: 'inherit'}) : require('child_process').execSync('bash scripts/build-cli.sh', {stdio: 'inherit'})\"",
 		"compile-cli-all-platforms": "scripts/build-cli-all-platforms.sh",
 		"compile-cli-man-page": "pandoc cli/man/cline.1.md -s -t man -o cli/man/cline.1",
 		"build:npm": "scripts/build-npm-package.sh",
@@ -533,5 +533,6 @@
 		],
 		"all": true,
 		"exclude-after-remap": true
-	}
+	},
+	"packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

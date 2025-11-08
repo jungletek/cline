@@ -35,6 +35,8 @@ src/generated/grpc-js
 src/generated/nice-grpc
 src/generated/grpc-go/cline
 src/generated/grpc-go/host
+src/generated/grpc-go/client
+src/generated/grpc-go/go.mod
 src/shared/proto/
 webview-ui/src/services/grpc-client.ts
 
