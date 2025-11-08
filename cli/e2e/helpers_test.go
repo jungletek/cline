@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -235,57 +234,33 @@ func waitForPortsClosed(t *testing.T, corePort, hostPort int, timeout time.Durat
 	})
 }
 
+// Global process manager instance
+var processManager = &ProcessManager{}
+
 // findAndKillHostProcess finds and kills any process listening on the host port
 // This is used to clean up dangling host processes after SIGKILL tests
 func findAndKillHostProcess(t *testing.T, hostPort int) {
 	t.Helper()
-	// Use lsof to find process listening on the host port
-	cmd := exec.Command("lsof", "-ti", fmt.Sprintf(":%d", hostPort))
-	output, err := cmd.Output()
-	if err != nil {
+	pid, err := processManager.GetProcessByPort(hostPort)
+	if err != nil || pid <= 0 {
 		// No process found on port - that's fine
 		return
 	}
 
-	pidStr := strings.TrimSpace(string(output))
-	if pidStr == "" {
-		return
-	}
-
-	var pid int
-	if _, err := fmt.Sscanf(pidStr, "%d", &pid); err != nil {
-		t.Logf("Warning: could not parse PID from lsof output: %s", pidStr)
-		return
-	}
-
-	if pid > 0 {
-		t.Logf("Cleaning up dangling host process PID %d on port %d", pid, hostPort)
-		if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-			t.Logf("Warning: failed to kill dangling host process %d: %v", pid, err)
-		}
+	t.Logf("Cleaning up dangling host process PID %d on port %d", pid, hostPort)
+	if err := processManager.KillProcess(pid, true); err != nil {
+		t.Logf("Warning: failed to kill dangling host process %d: %v", pid, err)
 	}
 }
 
 // getPIDByPort returns the PID of the process listening on the specified port (fallback method)
 func getPIDByPort(t *testing.T, port int) int {
 	t.Helper()
-	cmd := exec.Command("lsof", "-ti", fmt.Sprintf(":%d", port))
-	output, err := cmd.Output()
+	pid, err := processManager.GetProcessByPort(port)
 	if err != nil {
-		return 0 // Process not found
-	}
-
-	pidStr := strings.TrimSpace(string(output))
-	if pidStr == "" {
+		t.Logf("Warning: could not get PID for port %d: %v", port, err)
 		return 0
 	}
-
-	pid, err := strconv.Atoi(pidStr)
-	if err != nil {
-		t.Logf("Warning: could not parse PID from lsof output: %s", pidStr)
-		return 0
-	}
-
 	return pid
 }
 

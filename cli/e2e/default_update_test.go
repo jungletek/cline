@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 
 	"github.com/cline/cli/pkg/common"
@@ -73,7 +72,7 @@ func TestDefaultJsonUpdateAfterRemoval(t *testing.T) {
 		t.Fatalf("could not find PID for core process at %s", target.Address)
 	}
 	t.Logf("Killing cline-core process PID %d for instance %s", corePID, target.Address)
-	if err := syscall.Kill(corePID, syscall.SIGKILL); err != nil {
+	if err := processManager.KillProcess(corePID, true); err != nil {
 		t.Fatalf("kill pid %d: %v", corePID, err)
 	}
 

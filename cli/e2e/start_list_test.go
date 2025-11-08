@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"syscall"
 	"testing"
 )
 
@@ -117,7 +116,7 @@ func TestCrashCleanup(t *testing.T) {
 	}
 
 	t.Logf("Testing graceful shutdown (SIGTERM) for instance %s (PID %d)", gracefulTarget.Address, gracefulPID)
-	if err := syscall.Kill(gracefulPID, syscall.SIGTERM); err != nil {
+	if err := processManager.KillProcess(gracefulPID, false); err != nil {
 		t.Fatalf("kill SIGTERM pid %d: %v", gracefulPID, err)
 	}
 
@@ -141,7 +140,7 @@ func TestCrashCleanup(t *testing.T) {
 	}
 
 	t.Logf("Testing crash cleanup (SIGKILL) for instance %s (PID %d)", crashTarget.Address, crashPID)
-	if err := syscall.Kill(crashPID, syscall.SIGKILL); err != nil {
+	if err := processManager.KillProcess(crashPID, true); err != nil {
 		t.Fatalf("kill SIGKILL pid %d: %v", crashPID, err)
 	}
 
