@@ -44,6 +44,5 @@ webview-ui/src/services/grpc-client.ts
 test-results
 
 go.work.sum
-#package-lock.json
 
 bugfix.md
