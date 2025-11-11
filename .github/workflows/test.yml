@@ -229,6 +229,7 @@ jobs:
               shell: cmd
 
             - name: Verify CLI build outputs exist
+              shell: cmd
               run: |
                   if not exist "cli\bin\cline.exe" (
                       echo "ERROR: cline.exe not built!"
