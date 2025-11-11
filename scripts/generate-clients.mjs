@@ -1,7 +1,7 @@
 import * as fs from "fs/promises"
 import { globby } from "globby"
 import * as path from "path"
-import { createServiceNameMap, parseProtoForServices } from "./scripts/proto-shared-utils.mjs"
+import { createServiceNameMap, parseProtoForServices } from "./proto-shared-utils.mjs"
 
 const ROOT_DIR = "."
 const PROTO_DIR = path.resolve("proto")
