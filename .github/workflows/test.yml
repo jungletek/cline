@@ -224,6 +224,12 @@ jobs:
               with:
                   go-version: '1.24'
 
+            - name: Setup protoc
+              uses: arduino/setup-protoc@v3
+              with:
+                  version: '27.0'
+                  include-pre-releases: true
+
             - name: Test Windows CLI build script
               run: scripts/build-cli.bat
               shell: cmd
