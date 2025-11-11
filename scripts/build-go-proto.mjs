@@ -146,10 +146,24 @@ async function setupGoDependencies() {
 
 export async function goProtoc(outDir, protoFiles) {
 	// Setup dependencies first
-	await setupGoDependencies()
+	console.log(chalk.cyan("Step 1: Setting up Go dependencies..."))
+	try {
+		await setupGoDependencies()
+		console.log(chalk.green("✓ Go dependencies setup complete"))
+	} catch (error) {
+		console.error(chalk.red("FAILED: Go dependencies setup:"), error.message)
+		throw error
+	}
 
 	// Create output directory if it doesn't exist
-	await fs.mkdir(outDir, { recursive: true })
+	console.log(chalk.cyan("Step 2: Creating output directory..."))
+	try {
+		await fs.mkdir(outDir, { recursive: true })
+		console.log(chalk.green("✓ Output directory created"))
+	} catch (error) {
+		console.error(chalk.red("FAILED: Create output directory:"), error.message)
+		throw error
+	}
 
 	// Simple protoc command - proto files now have correct go_package paths
 	const goProtocCommand = [
@@ -162,11 +176,14 @@ export async function goProtoc(outDir, protoFiles) {
 		...protoFiles,
 	].join(" ")
 
+	console.log(chalk.cyan("Step 3: Running protoc command..."))
+	console.log(chalk.gray(`Command: ${goProtocCommand}`))
 	try {
-		console.log(chalk.cyan(`Generating Go code in ${outDir}...`))
 		execSync(goProtocCommand, { stdio: "inherit" })
+		console.log(chalk.green("✓ Protoc command executed successfully"))
 	} catch (error) {
-		console.error(chalk.red("Error generating Go code:"), error)
+		console.error(chalk.red("FAILED: Protoc command execution:"), error.message)
+		console.error(chalk.red("Exit code:"), error.status || "unknown")
 
 		// Provide additional help if the error might be related to missing tools
 		if (error.message.includes("protoc-gen-go")) {
@@ -174,14 +191,44 @@ export async function goProtoc(outDir, protoFiles) {
 			console.log(chalk.yellow("This error might be caused by Go protobuf tools not being in your PATH."))
 			console.log(chalk.yellow("Please ensure the tools are properly installed and accessible."))
 		}
-
-		process.exit(1)
+		throw error
 	}
 
-	await generateGoMod()
-	await generateGoConnection()
-	await generateGoClient()
-	await generateGoServiceClients()
+	console.log(chalk.cyan("Step 4: Generating Go module file..."))
+	try {
+		await generateGoMod()
+		console.log(chalk.green("✓ Go module file generated"))
+	} catch (error) {
+		console.error(chalk.red("FAILED: Go module generation:"), error.message)
+		throw error
+	}
+
+	console.log(chalk.cyan("Step 5: Generating Go connection manager..."))
+	try {
+		await generateGoConnection()
+		console.log(chalk.green("✓ Go connection manager generated"))
+	} catch (error) {
+		console.error(chalk.red("FAILED: Go connection generation:"), error.message)
+		throw error
+	}
+
+	console.log(chalk.cyan("Step 6: Generating Go client..."))
+	try {
+		await generateGoClient()
+		console.log(chalk.green("✓ Go client generated"))
+	} catch (error) {
+		console.error(chalk.red("FAILED: Go client generation:"), error.message)
+		throw error
+	}
+
+	console.log(chalk.cyan("Step 7: Generating Go service clients..."))
+	try {
+		await generateGoServiceClients()
+		console.log(chalk.green("✓ Go service clients generated"))
+	} catch (error) {
+		console.error(chalk.red("FAILED: Go service clients generation:"), error.message)
+		throw error
+	}
 }
 
 async function generateGoMod() {
@@ -577,25 +624,58 @@ ${methods}
 // Main execution block - run if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
 	async function main() {
-		try {
-			console.log(chalk.cyan("Starting Go protobuf code generation..."))
+		console.log(chalk.blue.bold("Starting Go protobuf code generation..."))
 
-			// Get all proto files
+		try {
+			console.log(chalk.cyan("Step 1: Discovering proto files..."))
 			const protoFiles = await globby("**/*.proto", { cwd: PROTO_DIR })
-			console.log(chalk.cyan(`Found ${protoFiles.length} proto files`))
+			console.log(chalk.green(`✓ Found ${protoFiles.length} proto files`))
+			for (const file of protoFiles) {
+				console.log(chalk.gray(`  - ${file}`))
+			}
+
+			if (protoFiles.length === 0) {
+				throw new Error(`No .proto files found in ${PROTO_DIR}`)
+			}
 
 			// Set output directory for Go code - use the new location
 			const goOutDir = GO_PROTO_DIR
+			console.log(chalk.cyan(`Step 2: Using output directory: ${goOutDir}`))
 
 			// Call the goProtoc function
 			await goProtoc(goOutDir, protoFiles)
 
-			console.log(chalk.green("✓ Go protobuf code generation completed successfully!"))
+			console.log(chalk.green.bold("Go protobuf code generation completed successfully!"))
+			console.log(chalk.green(`Output directory: ${goOutDir}`))
+			console.log(chalk.green("Generated: protobuf stubs, Go clients, connection managers, service wrappers"))
 		} catch (error) {
-			console.error(chalk.red("Error during Go protobuf generation:"), error)
+			console.error(chalk.red.bold("CRITICAL: Go protobuf generation FAILED"))
+			console.error(chalk.red("Error details:"), error.message)
+			console.error(chalk.red("Stack trace:"), error.stack)
+
+			// Check for common failure causes
+			if (error.message.includes("ENOENT")) {
+				console.error(chalk.yellow("Possible cause: Missing protocol buffer tools or files"))
+			} else if (error.message.includes("grpc-tools")) {
+				console.error(chalk.yellow("Possible cause: Node.js grpc-tools package not installed"))
+				console.error(chalk.yellow("   Try: npm install"))
+			} else if (error.message.includes("protoc-gen-go")) {
+				console.error(chalk.yellow("Possible cause: Go protobuf plugins not in PATH"))
+				console.error(chalk.yellow("   Try: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"))
+			} else if (error.message.includes("Cannot find module")) {
+				console.error(chalk.yellow("Possible cause: Missing Node.js dependency"))
+				console.error(chalk.yellow("   Try: npm install"))
+			}
+
+			console.error(chalk.red.bold("🔍 Please check the error details above and fix the issues"))
 			process.exit(1)
 		}
 	}
 
-	main()
+	console.log(chalk.blue("🔧 Executing main() function..."))
+	main().catch((unexpectedError) => {
+		console.error(chalk.red.bold("UNEXPECTED CRITICAL FAILURE:"))
+		console.error(chalk.red("This error bypassed normal error handling:"), unexpectedError)
+		process.exit(1)
+	})
 }
