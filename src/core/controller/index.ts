@@ -640,6 +640,23 @@ export class Controller {
 		}
 	}
 
+	async handleMcpOAuthCallback(serverHash: string, code: string, state: string | null) {
+		try {
+			await this.mcpHub.completeOAuth(serverHash, code, state)
+			await this.postStateToWebview()
+			HostProvider.window.showMessage({
+				type: ShowMessageType.INFORMATION,
+				message: `Successfully authenticated MCP server`,
+			})
+		} catch (error) {
+			console.error("Failed to complete MCP OAuth:", error)
+			HostProvider.window.showMessage({
+				type: ShowMessageType.ERROR,
+				message: `Failed to authenticate MCP server`,
+			})
+		}
+	}
+
 	async handleTaskCreation(prompt: string) {
 		await sendChatButtonClickedEvent()
 		await this.initTask(prompt)
@@ -850,6 +867,8 @@ export class Controller {
 		const enableCheckpointsSetting = this.stateManager.getGlobalSettingsKey("enableCheckpointsSetting")
 		const globalClineRulesToggles = this.stateManager.getGlobalSettingsKey("globalClineRulesToggles")
 		const globalWorkflowToggles = this.stateManager.getGlobalSettingsKey("globalWorkflowToggles")
+		const remoteRulesToggles = this.stateManager.getGlobalStateKey("remoteRulesToggles")
+		const remoteWorkflowToggles = this.stateManager.getGlobalStateKey("remoteWorkflowToggles")
 		const shellIntegrationTimeout = this.stateManager.getGlobalSettingsKey("shellIntegrationTimeout")
 		const terminalReuseEnabled = this.stateManager.getGlobalStateKey("terminalReuseEnabled")
 		const vscodeTerminalExecutionMode = this.stateManager.getGlobalStateKey("vscodeTerminalExecutionMode")
@@ -872,6 +891,7 @@ export class Controller {
 		const localClineRulesToggles = this.stateManager.getWorkspaceStateKey("localClineRulesToggles")
 		const localWindsurfRulesToggles = this.stateManager.getWorkspaceStateKey("localWindsurfRulesToggles")
 		const localCursorRulesToggles = this.stateManager.getWorkspaceStateKey("localCursorRulesToggles")
+		const localAgentsRulesToggles = this.stateManager.getWorkspaceStateKey("localAgentsRulesToggles")
 		const workflowToggles = this.stateManager.getWorkspaceStateKey("workflowToggles")
 		const autoCondenseThreshold = this.stateManager.getGlobalSettingsKey("autoCondenseThreshold")
 
@@ -927,14 +947,18 @@ export class Controller {
 			localClineRulesToggles: localClineRulesToggles || {},
 			localWindsurfRulesToggles: localWindsurfRulesToggles || {},
 			localCursorRulesToggles: localCursorRulesToggles || {},
+			localAgentsRulesToggles: localAgentsRulesToggles || {},
 			localWorkflowToggles: workflowToggles || {},
 			globalWorkflowToggles: globalWorkflowToggles || {},
+			remoteRulesToggles: remoteRulesToggles,
+			remoteWorkflowToggles: remoteWorkflowToggles,
 			shellIntegrationTimeout,
 			terminalReuseEnabled,
 			vscodeTerminalExecutionMode: vscodeTerminalExecutionMode,
 			defaultTerminalProfile,
 			isNewUser,
 			welcomeViewCompleted,
+			showOnboardingFlow: featureFlagsService.getOnboardingEnabled(),
 			mcpResponsesCollapsed,
 			terminalOutputLineLimit,
 			maxConsecutiveMistakes,
