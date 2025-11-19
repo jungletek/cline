@@ -66,69 +66,14 @@ if not exist "src\generated\grpc-go\client" mkdir "src\generated\grpc-go\client"
 if not exist "src\generated\grpc-go\client\services" mkdir "src\generated\grpc-go\client\services" 2>nul
 echo ✓ Go protobuf directories ready before script
 
-echo Running npx protoc...
-protoc --proto_path="proto" --go_out="src/generated/grpc-go" --go_opt=module=github.com/cline/grpc-go --go-grpc_out="src/generated/grpc-go" --go-grpc_opt=module=github.com/cline/grpc-go proto/cline/*.proto proto/host/*.proto
+echo Running run protos-go...
+call npm run protos-go
 if %errorlevel% neq 0 (
     echo ERROR: Failed to generate Go protobuf files
     exit /b 1
 )
-REM After npx protoc, ensure go.mod exists
-if not exist "src\generated\grpc-go\go.mod" (
-    echo Creating go.mod backup...
-    (
-        echo module github.com/cline/grpc-go
-        echo.
-        echo go 1.21
-        echo.
-        echo require ^(
-        echo         google.golang.org/grpc v1.65.0
-        echo         google.golang.org/protobuf v1.34.2
-        echo ^)
-        echo.
-        echo require ^(
-        echo         golang.org/x/net v0.26.0 // indirect
-        echo         golang.org/x/sys v0.21.0 // indirect
-        echo         golang.org/x/text v0.16.0 // indirect
-        echo         google.golang.org/genproto/googleapis/rpc v0.0.0-20240604185151-ef581f913117 // indirect
-        echo ^)
-) > "src\generated\grpc-go\go.mod"
-    echo ✓ go.mod created
-)
-REM After creating go.mod, initialize the module cache
-echo Initializing Go module...
-cd src\generated\grpc-go
-go mod download
-go mod tidy
-go list -m all
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to initialize Go module
-    exit /b 1
-)
-
-REM DEBUG: Check what's actually generated
-echo Checking generated grpc-go contents...
-echo === Directory listing ===
-dir /b /s
-echo.
-echo === Package declarations ===
-for /r %%f in (*.go) do (
-    echo === %%~nf%%~xf ===
-    findstr "^package " "%%f"
-    echo.
-)
-echo ✓ Debug output complete
-
-cd ..\..\..
 
 echo ✓ Protobuf files regenerated
-
-echo Running client generation...
-call node scripts/generate-clients.mjs 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Client generation failed
-    exit /b 1
-)
-echo ✓ Client generation completed
 
 cd cli
 
