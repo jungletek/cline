@@ -622,7 +622,7 @@ ${methods}
 }
 
 // Main execution block - run if this script is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && process.argv[1].endsWith("build-go-proto.mjs")) {
 	async function main() {
 		console.log(chalk.blue.bold("Starting Go protobuf code generation..."))
 
